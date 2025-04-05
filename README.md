@@ -14,6 +14,8 @@ Develop a model that takes an image as input and returns the **top-k visually si
 
 ## RESULTS AND APP INTERFACE (using streamlit)
 
+### DEMONSTRATION OF THE SIMILIARITY SEARCH MODEL : <video controls src="demo-1.mp4" title="Title"></video>
+
 <div align="center"> <img src="vase_similar.png" width=""/></div>
 
 ---
@@ -96,6 +98,8 @@ streamlit run app.py
       ↓
 [Top-k Similar Images]
 ```
+## DATASET RELATION
+![alt text](opendata_relationship.jpg)
 
 ## Future Work
 
@@ -104,4 +108,9 @@ streamlit run app.py
 - Add semantic filtering (e.g., match only within same genre or artist)
 
 -    Speed up with FAISS for large-scale similarity search
+
+## AUTHOR
+
+### Chandradithya Janaswami 
+
 
