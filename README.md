@@ -14,7 +14,9 @@ Develop a model that takes an image as input and returns the **top-k visually si
 
 ## RESULTS AND APP INTERFACE (using streamlit)
 
-### DEMONSTRATION OF THE SIMILIARITY SEARCH MODEL : <video controls src="demo-1.mp4" title="Title"></video>
+### DEMONSTRATION OF THE SIMILIARITY SEARCH MODEL : [LINK](https://drive.google.com/file/d/19OF1MYjcQzn7-sbZiTrNDaorsK9Rf1YL/view?usp=sharing)
+
+---
 
 <div align="center"> <img src="vase_similar.png" width=""/></div>
 
