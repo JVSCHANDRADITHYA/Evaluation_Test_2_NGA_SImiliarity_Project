@@ -1,48 +1,73 @@
+import os
 import pandas as pd
 import requests
-import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from PIL import Image
+from io import BytesIO
+from time import sleep
 
-# Load CSV file
-data = pd.read_csv(r"F:\NGA_Similarity_Project\data\published_images.csv")  # Update with the correct file path
+SAVE_DIR = "NGA_Images_Fixed"
+FAILED_CSV = "failed_images.csv"
+os.makedirs(SAVE_DIR, exist_ok=True)
 
-# Define the output directory (Google Drive path)
-output_dir = r"D:\NGA_open_dataset"
-os.makedirs(output_dir, exist_ok=True)
+sizes_to_try = [360, 0, 90]
 
-# Log file path
-log_file = os.path.join(output_dir, "download_log.txt")
-
-# Open the log file in append mode
-with open(log_file, "a") as log:
-    log.write("Download Log\n")
-    log.write("=" * 50 + "\n")
-
-# Loop through iiif URLs and download images
-for _, row in data.dropna(subset=["iiifurl"]).iterrows():
+def is_valid_image(image_bytes):
     try:
-        base_url = row["iiifurl"]
-        uuid = row["uuid"]  # Extracting the UUID for naming
-        image_url = f"{base_url}/full/full/0/default.jpg"
-        file_name = f"{uuid}.jpg"  # Naming the file with its UUID
-        file_path = os.path.join(output_dir, file_name)
+        img = Image.open(BytesIO(image_bytes))
+        img.verify()
+        return True
+    except Exception:
+        return False
 
-        response = requests.get(image_url, stream=True)
+def download_image(row, retries=3):
+    base_url = row["iiifurl"]
+    uuid = row["uuid"]
+    file_path = os.path.join(SAVE_DIR, f"{uuid}.jpg")
 
-        if response.status_code == 200:
-            with open(file_path, "wb") as file:
-                for chunk in response.iter_content(1024):
-                    file.write(chunk)
+    # Skip if already downloaded
+    if os.path.exists(file_path):
+        print(f"Already exists: {uuid}")
+        return None
 
-            # Log the download
-            with open(log_file, "a") as log:
-                log.write(f"Downloaded: {file_name} | URL: {image_url}\n")
+    for attempt in range(retries):
+        for size in sizes_to_try:
+            url = f"{base_url}/full/full/{size}/default.jpg"
+            try:
+                r = requests.get(url, timeout=20)
+                if r.status_code == 200 and is_valid_image(r.content):
+                    with open(file_path, 'wb') as f:
+                        f.write(r.content)
+                    print(f"Downloaded: {uuid} at {size}px")
+                    return None
+                else:
+                    print(f"Invalid/empty image: {uuid} at {size}px")
+            except requests.exceptions.RequestException as e:
+                print(f"Request error: {uuid} at {size}px - {e}")
+            sleep(1 + attempt)  # exponential backoff
 
-            print(f"Downloaded: {file_name}")
+    print(f"Final fail: {uuid}")
+    return {"uuid": uuid, "iiifurl": base_url}
 
-        else:
-            print(f"Failed: {image_url}")
+def download_all(csv_path, threads=16):
+    df = pd.read_csv(csv_path).dropna(subset=["iiifurl"])
+    failed_downloads = []
 
-    except Exception as e:
-        print(f"Error downloading {base_url}: {e}")
+    with ThreadPoolExecutor(max_workers=threads) as executor:
+        futures = {executor.submit(download_image, row): row for _, row in df.iterrows()}
+        for future in as_completed(futures):
+            fail = future.result()
+            if fail:
+                failed_downloads.append(fail)
 
-print("Download complete!")
+    if failed_downloads:
+        pd.DataFrame(failed_downloads).to_csv(FAILED_CSV, index=False)
+        print(f"Some images failed. Logged in {FAILED_CSV}")
+    else:
+        print("All images downloaded successfully.")
+
+if __name__ == "__main__":
+    csv_path = input("Enter path to published_images.csv: ").strip()
+    if csv_path == "":
+        csv_path = "data\published_images.csv"
+    download_all(csv_path)
